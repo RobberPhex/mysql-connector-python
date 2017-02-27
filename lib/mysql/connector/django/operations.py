@@ -43,6 +43,22 @@ class DatabaseOperations(BaseDatabaseOperations):
             return "EXTRACT({0} FROM {1})".format(
                 lookup_type.upper(), field_name)
 
+    def adapt_datetimefield_value(self, value):
+        if value is None:
+            return None
+
+        # MySQL doesn't support tz-aware datetimes
+        if timezone.is_aware(value):
+            if settings.USE_TZ:
+                value = timezone.make_naive(value, self.connection.timezone)
+            else:
+                raise ValueError("MySQL backend does not support timezone-aware datetimes when USE_TZ is False.")
+
+        if not self.connection.features.supports_microsecond_precision:
+            value = value.replace(microsecond=0)
+
+        return force_text(value)
+
     def date_trunc_sql(self, lookup_type, field_name):
         """Returns SQL simulating DATE_TRUNC
 
